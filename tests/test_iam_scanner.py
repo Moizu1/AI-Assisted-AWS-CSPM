@@ -15,7 +15,7 @@ class FakeIAM:
         else:
             return {"MFADevices": []}
     def get_account_password_policy(self):
-        return {"PasswordPolicy": {"MinimumPasswordLength": 8, "RequireSymbols": True, "RequireNumbers": True, "RequireUppercaseCharacters": True, "RequireLowercaseCharacters": True, "AllowUsersToChangePassword": True, "ExpirePasswords": True, "MaxPasswordAge": 90, "PasswordReusePrevention": 5}}
+        return {"PasswordPolicy": {"MinimumPasswordLength": 8, "RequireSymbols": False, "RequireNumbers": False, "RequireUppercaseCharacters": False, "RequireLowercaseCharacters": True, "AllowUsersToChangePassword": True, "ExpirePasswords": False, "MaxPasswordAge": 90, "PasswordReusePrevention": 3}}
 
 class FakeAWSClient:
     def __init__(self):
@@ -26,7 +26,7 @@ def test_iam_scanner():
     scanner = IAMScanner(fake_aws_client)
     findings = scanner.scan()
 
-    assert len(findings) == 2
+    assert len(findings) == 8
     resource_names = [finding.resource_name for finding in findings]
     assert "user2" in resource_names
     assert "user3" in resource_names
@@ -40,4 +40,14 @@ def test_iam_scanner():
     assert findings[0].resource_name == "user2"
 
     password_check = scanner.check_password_policy()
-    assert len(password_check) == 1
+    assert len(password_check) == 6
+    assert password_check[0].check == "Minimum Password Length"
+    assert password_check[1].check == "Require Uppercase Characters"
+    assert password_check[2].check == "Require Numbers"
+    assert password_check[3].check == "Require Symbols"
+    assert password_check[4].check == "Password Reuse Prevention"
+    assert password_check[5].check == "Password Expiration"
+
+    resource_types = [finding.resource_type for finding in findings]
+    assert resource_types.count("IAM Account") == 6
+    assert resource_types.count("IAM User") == 2
