@@ -43,6 +43,23 @@ class FakeS3Client:
             return None  
         else:
             return {"ServerSideEncryptionConfiguration": {"Rules": [{"ApplyServerSideEncryptionByDefault": {"SSEAlgorithm": "aws:kms"}}]}}
+
+    def get_bucket_versioning(self, Bucket):
+        if Bucket == "bucket1":
+            return {"Status": "Enabled"}
+        elif Bucket == "bucket2":
+            return {"Status": "Suspended"}
+        else:
+            return {}
+
+    def get_bucket_logging(self, Bucket):
+        if Bucket == "bucket1":
+            return {"LoggingEnabled": {"TargetBucket": "log-bucket", "TargetPrefix": "bucket1-logs/"}}
+        elif Bucket == "bucket2":
+             return {}
+        else:
+             return {"LoggingEnabled": {"TargetBucket": "log-bucket", "TargetPrefix": "bucket3-logs/"}}
+
         
 
     
@@ -74,7 +91,7 @@ def test_s3_scanner():
             assert scanner.check_public_access("bucket3") is True
 
             findings = scanner.scan()
-            assert len(findings) == 1
+            assert len(findings) == 5
             assert findings[0].resource_type == "S3 Bucket"
             assert findings[0].resource_name == "bucket2"
             assert findings[0].check == "S3 PUBLIC ACCESS BLOCK"
@@ -91,3 +108,14 @@ def test_s3_scanner():
             assert scanner.check_encryption("bucket1") is True
             assert scanner.check_encryption("bucket2") is False
             assert scanner.check_encryption("bucket3") is True
+
+            assert scanner.check_versioning("bucket1") is True
+            assert scanner.check_versioning("bucket2") is False
+            assert scanner.check_versioning("bucket3") is False
+
+            assert scanner.check_logging("bucket1") is True
+            assert scanner.check_logging("bucket2") is False    
+            assert scanner.check_logging("bucket3") is True
+
+            
+

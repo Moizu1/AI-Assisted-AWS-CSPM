@@ -7,16 +7,43 @@ class S3Scanner:
     findings = []
     buckets = self.list_buckets()
     for bucket in buckets:
-      bucket_name = bucket["Name"]
-      if not self.check_public_access(bucket_name):
-        finding = Finding(
-          resource_type="S3 Bucket",
-          resource_name=bucket_name,
-          check="S3 PUBLIC ACCESS BLOCK",
-          severity="High",
-          recommendation="Enable Public Access Block for the S3 bucket to enhance security."
-        )
-        findings.append(finding)
+        bucket_name = bucket["Name"]
+        if not self.check_public_access(bucket_name):
+                finding = Finding(
+                          resource_type="S3 Bucket",
+                          resource_name=bucket_name,
+                          check="S3 PUBLIC ACCESS BLOCK",
+                          severity="High",
+                          recommendation="Enable Public Access Block for the S3 bucket to enhance security."
+                        )
+                findings.append(finding)
+        if not self.check_encryption(bucket_name):
+                finding = Finding(
+                  resource_type="S3 Bucket",
+                  resource_name=bucket_name,
+                  check="S3 ENCRYPTION",
+                  severity="High",
+                  recommendation="Enable encryption for the S3 bucket to enhance security."
+                )
+                findings.append(finding)
+        if not self.check_versioning(bucket_name):
+                finding = Finding(
+                  resource_type="S3 Bucket",
+                  resource_name=bucket_name,
+                  check="S3 VERSIONING",
+                  severity="High",
+                  recommendation="Enable versioning for the S3 bucket to enhance data protection."
+                )
+                findings.append(finding)
+        if not self.check_logging(bucket_name):
+                finding = Finding(
+                  resource_type="S3 Bucket",
+                  resource_name=bucket_name,
+                  check="S3 LOGGING",
+                  severity="High",
+                  recommendation="Enable logging for the S3 bucket to enhance monitoring and auditing."
+                )
+                findings.append(finding)
     return findings
   def list_buckets(self):
     response = self.awsclient.s3.list_buckets()
@@ -33,5 +60,11 @@ class S3Scanner:
         return False
     else:
         return "ServerSideEncryptionConfiguration" in response
+  def check_versioning(self, bucket):
+    response = self.awsclient.s3.get_bucket_versioning(Bucket=bucket)
+    return response.get("Status") == "Enabled"
+  def check_logging(self, bucket):
+    response = self.awsclient.s3.get_bucket_logging(Bucket=bucket)
+    return "LoggingEnabled" in response
 
     
