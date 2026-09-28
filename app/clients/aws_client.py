@@ -9,3 +9,4 @@ class AWSClient:
         self.ec2 = boto3.client("ec2")
         self.rds = boto3.client("rds")
         self.cloudtrail = boto3.client("cloudtrail")
+        self.ebs = boto3.client("ebs")

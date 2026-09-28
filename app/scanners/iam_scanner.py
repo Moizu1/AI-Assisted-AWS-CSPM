@@ -34,6 +34,7 @@ class IAMScanner:
         username = user["UserName"]
         response = self.awsclient.iam.list_mfa_devices(UserName=username)
         return len(response["MFADevices"]) > 0
+    
     def check_password_policy(self):
         response = self.awsclient.iam.get_account_password_policy()
         findings = []
