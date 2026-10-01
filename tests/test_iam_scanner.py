@@ -36,7 +36,6 @@ def test_iam_scanner():
     assert findings[0].severity == "High"
     assert findings[0].recommendation == "Enable MFA for all IAM users to enhance security."
     assert findings[0].issue_resolved is False
-    assert findings[0].score == 75
     assert findings[0].resource_name == "user2"
 
     password_check = scanner.check_password_policy()

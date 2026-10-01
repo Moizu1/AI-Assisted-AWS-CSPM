@@ -1,5 +1,3 @@
-
-
 from app.models.finding import Finding
 
 
