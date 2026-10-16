@@ -143,3 +143,21 @@ def test_scan():
     findings = scanner.scan()
 
     assert len(findings) == 0
+
+def test_scan_no_trails():
+    class EmptyCloudTrailClient:
+        def describe_trails(self):
+            return {"trailList": []}
+
+    class EmptyAWSClient:
+        def __init__(self):
+            self.cloudtrail = EmptyCloudTrailClient()
+
+    awsclient = EmptyAWSClient()
+    scanner = CloudTrailScanner(awsclient)
+
+    findings = scanner.scan()
+
+    assert len(findings) == 1
+    assert findings[0].check == "CloudTrail Trail Exists"
+    assert findings[0].severity == "Critical"

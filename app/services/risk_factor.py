@@ -31,6 +31,7 @@ class RiskFactorService:
         ("CloudTrail", "Log File Validation"): (2, 4, 2),
         ("CloudTrail", "S3 Bucket Configured"): (2, 4, 2),
         ("CloudTrail", "CloudWatch Logs Configured"): (2, 4, 2),
+        ("CloudTrail", "CloudTrail Trail Exists"): (2, 5, 3),
         ("CloudTrail", "Management Events Enabled"): (2, 5, 3),
 
         # RDS

@@ -1,4 +1,5 @@
 from app.models.finding import Finding
+from botocore.exceptions import ClientError
 
 
 class IAMScanner:
@@ -36,10 +37,20 @@ class IAMScanner:
         return len(response["MFADevices"]) > 0
     
     def check_password_policy(self):
-        response = self.awsclient.iam.get_account_password_policy()
         findings = []
-        policy = response.get("PasswordPolicy", {})
-        minimum_password_length= policy.get("MinimumPasswordLength", 0)
+        try:
+            response = self.awsclient.iam.get_account_password_policy()
+            policy = response.get("PasswordPolicy", {})
+
+        except ClientError as error:
+            error_code = error.response.get("Error", {}).get("Code")
+
+            if error_code == "NoSuchEntity":
+               policy = {}
+            else:
+               raise
+
+        minimum_password_length = policy.get("MinimumPasswordLength", 0)
         if minimum_password_length < 14:
             finding = Finding(
                 resource_type="IAM Account",

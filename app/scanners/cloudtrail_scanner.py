@@ -7,9 +7,17 @@ class CloudTrailScanner:
 
     def scan(self):
      findings = []
-     trails = self.awsclient.cloudtrail.describe_trails()["trailList"]
+     trails = self.awsclient.cloudtrail.describe_trails().get("trailList", [])
 
-     for trail in trails:
+     if not trails:
+        findings.append(Finding(
+            resource_type="CloudTrail",
+            resource_name="AWS Account",
+            check="CloudTrail Trail Exists",
+            severity="Critical",
+            recommendation="Create a CloudTrail trail and enable logging to record AWS account activity."
+        ))
+        return findings
 
         if not self.check_logging_enabled(trail):
             findings.append(Finding(

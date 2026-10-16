@@ -127,6 +127,7 @@ def test_fake_ec2_client():
     assert security_groups[4]["GroupId"] == "sg-005"
     assert security_groups[5]["GroupId"] == "sg-006"
 
+
 def test_check_ssh_open():
     scanner = EC2Scanner(None)
 
@@ -139,12 +140,16 @@ def test_check_ssh_open():
 def test_check_rdp_open():
     scanner = EC2Scanner(None)
 
-    security_groups = FakeEC2Client().describe_security_groups()["SecurityGroups"]
+    security_groups = (
+        FakeEC2Client().describe_security_groups()["SecurityGroups"]
+    )
 
-    assert scanner.check_rdp_open(security_groups[0]) == True
-    assert scanner.check_rdp_open(security_groups[1]) == True
-    assert scanner.check_rdp_open(security_groups[2]) == False
-    assert scanner.check_rdp_open(security_groups[3]) == True
+    assert scanner.check_rdp_open(security_groups[0]) is True
+    assert scanner.check_rdp_open(security_groups[1]) is True
+    assert scanner.check_rdp_open(security_groups[2]) is False
+    assert scanner.check_rdp_open(security_groups[3]) is False
+    assert scanner.check_rdp_open(security_groups[4]) is True
+    assert scanner.check_rdp_open(security_groups[5]) is True
 
 def test_check_all_ports_open():
     scanner = EC2Scanner(None)
@@ -159,13 +164,27 @@ def test_check_all_ports_open():
 def test_check_dangerous_ports_open():
     scanner = EC2Scanner(None)
 
-    security_groups = FakeEC2Client().describe_security_groups()["SecurityGroups"]
+    security_groups = (
+        FakeEC2Client().describe_security_groups()["SecurityGroups"]
+    )
 
-    assert scanner.check_dangerous_ports_open(security_groups[0]) == True
-    assert scanner.check_dangerous_ports_open(security_groups[1]) == True
-    assert scanner.check_dangerous_ports_open(security_groups[2]) == True
-    assert scanner.check_dangerous_ports_open(security_groups[3]) == True
-    assert scanner.check_dangerous_ports_open(security_groups[4]) == False
+    # SSH open: port 22 is not in the dangerous port list.
+    assert scanner.check_dangerous_ports_open(security_groups[0]) is True
+
+    # SSH restricted: no dangerous ports exposed to the internet.
+    assert scanner.check_dangerous_ports_open(security_groups[1]) is True
+
+    # RDP open: port 3389 is not in the dangerous port list.
+    assert scanner.check_dangerous_ports_open(security_groups[2]) is True
+
+    # All protocols open to the internet: dangerous exposure detected.
+    assert scanner.check_dangerous_ports_open(security_groups[3]) is False
+
+    # MySQL port 3306 open to the internet.
+    assert scanner.check_dangerous_ports_open(security_groups[4]) is False
+
+    # SSH open over IPv6: port 22 is not in the dangerous port list.
+    assert scanner.check_dangerous_ports_open(security_groups[5]) is True
 def test_check_ssh_ipv6_open():
     scanner = EC2Scanner(None)
 
@@ -179,12 +198,62 @@ def test_ec2_scanner():
 
     findings = scanner.scan()
 
-    assert len(findings) == 5
-    checks = [finding.check for finding in findings]
-    assert "SSH OPEN TO THE WORLD" in checks
-    assert "RDP OPEN TO THE WORLD" in checks
-    assert "ALL PORTS OPEN TO THE WORLD" in checks
-    assert "DANGEROUS PORTS OPEN TO THE WORLD" in checks
-    assert "SSH OPEN TO THE WORLD (IPv6)" in checks
+    actual_findings = {
+        (finding.resource_name, finding.check)
+        for finding in findings
+    }
+
+    expected_findings = {
+        ("test-sg-22-open", "SSH OPEN TO THE WORLD"),
+        ("test-sg-rdp-open", "RDP OPEN TO THE WORLD"),
+        ("test-sg-all-open", "RDP OPEN TO THE WORLD"),
+        ("test-sg-all-open", "ALL PORTS OPEN TO THE WORLD"),
+        ("test-sg-all-open", "DANGEROUS PORTS OPEN TO THE WORLD"),
+        ("test-sg-dangerous-ports-open", "DANGEROUS PORTS OPEN TO THE WORLD"),
+        ("test-sg-ssh-ipv6-open", "SSH OPEN TO THE WORLD (IPv6)"),
+        ("test-sg-all-open", "SSH OPEN TO THE WORLD"),
+    }
+
+    assert actual_findings == expected_findings
+
+def test_ssh_open_through_port_range():
+    scanner = EC2Scanner(None)
+
+    security_group = {
+        "GroupId": "sg-range-test",
+        "GroupName": "test-sg-ssh-range",
+        "IpPermissions": [
+            {
+                "IpProtocol": "tcp",
+                "FromPort": 20,
+                "ToPort": 25,
+                "IpRanges": [
+                    {"CidrIp": "0.0.0.0/0"}
+                ],
+            }
+        ],
+    }
+
+    assert scanner.check_ssh_open(security_group) is False
+
+def test_ssh_open_through_ipv6_port_range():
+    scanner = EC2Scanner(None)
+
+    security_group = {
+        "GroupId": "sg-ipv6-range-test",
+        "GroupName": "test-sg-ssh-ipv6-range",
+        "IpPermissions": [
+            {
+                "IpProtocol": "tcp",
+                "FromPort": 20,
+                "ToPort": 25,
+                "Ipv6Ranges": [
+                    {"CidrIpv6": "::/0"}
+                ],
+            }
+        ],
+    }
+
+    assert scanner.check_ssh_ipv6_open(security_group) is False
 
 
