@@ -12,17 +12,7 @@ def save_scan_results(
     status: str = "COMPLETED",
     region: str = "us-east-1",
 ) -> Scan:
-    """
-    Save a completed AWS scan and its findings to PostgreSQL.
-
-    Args:
-        db: SQLAlchemy database session.
-        findings: List of findings produced by the scanners.
-        region: AWS region that was scanned.
-
-    Returns:
-        The saved Scan database record.
-    """
+   
 
     try:
         # 1. Calculate the overall scan risk score.
@@ -38,7 +28,7 @@ def save_scan_results(
         scan = Scan(
             started_at=datetime.now(timezone.utc),
             completed_at=datetime.now(timezone.utc),
-            status="COMPLETED",
+            status=status,
             region=region,
             total_findings=len(findings),
             risk_score=overall_risk_score,

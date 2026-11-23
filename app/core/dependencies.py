@@ -1,0 +1,60 @@
+from fastapi import Depends, HTTPException, status
+from fastapi.security import HTTPBearer, HTTPAuthorizationCredentials
+from sqlalchemy.orm import Session
+import jwt
+
+from app.database.dependencies import get_db
+from app.models.user import User
+from app.core.security import decode_access_token
+
+
+bearer_scheme = HTTPBearer()
+
+
+def get_current_user(
+    credentials: HTTPAuthorizationCredentials = Depends(bearer_scheme),
+    db: Session = Depends(get_db)
+):
+    token = credentials.credentials
+
+    try:
+        payload = decode_access_token(token)
+        user_id = int(payload.get("sub"))
+
+    except (jwt.InvalidTokenError, TypeError, ValueError):
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="Invalid or expired authentication token",
+            headers={"WWW-Authenticate": "Bearer"}
+        )
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user or user.status != "ACTIVE":
+        raise HTTPException(
+            status_code=status.HTTP_401_UNAUTHORIZED,
+            detail="User account is unavailable"
+        )
+
+    return user
+
+from fastapi import HTTPException, Depends, status
+
+
+def require_roles(*allowed_roles):
+    """
+    Restrict an endpoint to specified user roles.
+    """
+
+    def role_checker(
+        current_user=Depends(get_current_user)
+    ):
+        if current_user.role not in allowed_roles:
+            raise HTTPException(
+                status_code=status.HTTP_403_FORBIDDEN,
+                detail="You do not have permission to perform this action."
+            )
+
+        return current_user
+
+    return role_checker
