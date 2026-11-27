@@ -20,6 +20,7 @@ from app.database.database import Base, DATABASE_URL
 from app.models.scan import Scan
 from app.models.finding_record import FindingRecord
 from app.models.user import User
+from app.models.audit_log import AuditLog
 
 # Get Alembic configuration
 config = context.config

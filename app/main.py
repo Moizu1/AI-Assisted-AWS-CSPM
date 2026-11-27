@@ -3,6 +3,7 @@ from app.api.scans import router as scans_router
 from app.api.dashboard import router as dashboard_router
 from app.api.auth import router as auth_router
 from app.api.users import router as users_router
+from app.api.audit import router as audit_router
 
 app = FastAPI(title="AWS CSPM API")
 app.include_router(scans_router, prefix="/api/scans", tags=["Scans"])
@@ -22,4 +23,10 @@ app.include_router(
     users_router,
     prefix="/api/users",
     tags=["User Management"]
+)
+
+app.include_router(
+    audit_router,
+    prefix="/api/audit",
+    tags=["Audit Logs"]
 )

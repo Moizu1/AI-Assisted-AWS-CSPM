@@ -3,6 +3,7 @@ from datetime import datetime, timezone
 from sqlalchemy.orm import Session
 
 from app.models.user import User
+from app.services.audit_service import create_audit_log
 
 
 def get_pending_users(db: Session):
@@ -47,6 +48,15 @@ def approve_user(
     user.rejection_reason = None
 
     db.commit()
+
+    create_audit_log(
+    db=db,
+    performed_by_id=admin.id,
+    action="USER_APPROVED",
+    target_user_id=user.id,
+    details=f"User approved with role {assigned_role}"
+  )
+
     db.refresh(user)
 
     return user
@@ -74,6 +84,15 @@ def reject_user(
     user.rejection_reason = reason
 
     db.commit()
+
+    create_audit_log(
+    db=db,
+    performed_by_id=admin.id,
+    action="USER_REJECTED",
+    target_user_id=user.id,
+    details=f"Rejection reason: {reason}"
+    )
+
     db.refresh(user)
 
     return user
@@ -95,24 +114,172 @@ def update_user_role(
     if admin.role not in ["SUPER_ADMIN", "ADMIN"]:
         raise PermissionError("Insufficient permissions")
 
-    if user.role in ["SUPER_ADMIN", "ADMIN"]:
-        if admin.role != "SUPER_ADMIN":
-            raise PermissionError(
-                "Only Super Admin can modify Admin accounts"
-            )
+    # Prevent users from changing their own roles
+    if user.id == admin.id:
+        raise PermissionError("You cannot change your own role")
+
+    # Protect Super Admin accounts
+    if user.role == "SUPER_ADMIN":
+        raise PermissionError(
+            "Super Admin accounts cannot be modified"
+        )
+
+    # Only Super Admin can modify Admin accounts
+    if user.role == "ADMIN" and admin.role != "SUPER_ADMIN":
+        raise PermissionError(
+            "Only Super Admin can modify Admin accounts"
+        )
 
     if new_role not in ["ADMIN", "ANALYST", "VIEWER"]:
         raise ValueError("Invalid role")
 
     if new_role == "ADMIN" and admin.role != "SUPER_ADMIN":
-        raise PermissionError("Only Super Admin can assign Admin role")
-
-    if user.id == admin.id:
-        raise PermissionError("You cannot change your own role")
+        raise PermissionError(
+            "Only Super Admin can assign Admin role"
+        )
 
     user.role = new_role
 
     db.commit()
+
+    create_audit_log(
+    db=db,
+    performed_by_id=admin.id,
+    action="USER_ROLE_UPDATED",
+    target_user_id=user.id,
+    details=f"New role assigned: {new_role}"
+    )
+
+    db.refresh(user)
+
+    return user
+
+def get_all_users(
+    db: Session,
+    role: str | None = None,
+    status: str | None = None,
+    search: str | None = None
+):
+    """Return users with optional role, status, and search filters."""
+
+    query = db.query(User)
+
+    # Filter by role
+    if role:
+        query = query.filter(User.role == role.upper())
+
+    # Filter by account status
+    if status:
+        query = query.filter(User.status == status.upper())
+
+    # Search by name or email
+    if search:
+        search_term = f"%{search.strip()}%"
+        query = query.filter(
+            (User.full_name.ilike(search_term)) |
+            (User.email.ilike(search_term))
+        )
+
+    return query.order_by(User.created_at.desc()).all()
+
+def deactivate_user(
+    db: Session,
+    user_id: int,
+    admin: User
+):
+    """Deactivate an existing user account."""
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        return None
+
+    if admin.role not in ["SUPER_ADMIN", "ADMIN"]:
+        raise PermissionError("Insufficient permissions")
+
+    if user.id == admin.id:
+        raise PermissionError(
+            "You cannot deactivate your own account"
+        )
+
+    if user.role == "SUPER_ADMIN":
+        raise PermissionError(
+            "Super Admin accounts cannot be deactivated"
+        )
+
+    if user.role == "ADMIN" and admin.role != "SUPER_ADMIN":
+        raise PermissionError(
+            "Only Super Admin can deactivate Admin accounts"
+        )
+
+    if user.status != "ACTIVE":
+        raise ValueError(
+            "Only active accounts can be deactivated"
+        )
+
+    user.status = "DEACTIVATED"
+
+    db.commit()
+
+    create_audit_log(
+    db=db,
+    performed_by_id=admin.id,
+    action="USER_DEACTIVATED",
+    target_user_id=user.id,
+    details="User account deactivated by administrator"
+    )
+
+    db.refresh(user)
+
+    return user
+
+def activate_user(
+    db: Session,
+    user_id: int,
+    admin: User
+):
+    """Reactivate a previously deactivated user account."""
+
+    user = db.query(User).filter(User.id == user_id).first()
+
+    if not user:
+        return None
+
+    if admin.role not in ["SUPER_ADMIN", "ADMIN"]:
+        raise PermissionError("Insufficient permissions")
+
+    if user.id == admin.id:
+        raise PermissionError(
+            "You cannot change your own account status"
+        )
+
+    if user.role == "SUPER_ADMIN":
+        raise PermissionError(
+            "Super Admin accounts cannot be modified"
+        )
+
+    if user.role == "ADMIN" and admin.role != "SUPER_ADMIN":
+        raise PermissionError(
+            "Only Super Admin can activate Admin accounts"
+        )
+
+    if user.status != "DEACTIVATED":
+        raise ValueError(
+            "Only deactivated accounts can be activated"
+        )
+
+    user.status = "ACTIVE"
+
+    db.commit()
+
+    create_audit_log(
+    db=db,
+    performed_by_id=admin.id,
+    action="USER_ACTIVATED",
+    target_user_id=user.id,
+    details="User account activated by administrator"
+)
+
     db.refresh(user)
 
     return user
